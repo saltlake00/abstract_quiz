@@ -746,16 +746,6 @@ button:active {
   font-weight: 700;
 }
 
-.penalty-tag {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: rgba(16, 185, 129, 0.2);
-  color: #6ee7b7;
-}
-
 /* 우측 사이드 패널 (점수판 + 채팅) */
 .chat-col {
   display: flex;

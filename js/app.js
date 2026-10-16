@@ -942,13 +942,10 @@
     listEl.innerHTML = sorted
       .map((p, idx) => {
         const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
-        const isLast = sorted.length > 1 && idx === sorted.length - 1;
-        const penaltyBadge = isLast ? '<span class="penalty-tag">🥒 벌칙: 피클팝 당첨!</span>' : "";
         return `
           <div class="final-rank-row ${idx === 0 ? "winner" : ""}">
             <span class="fr-rank">${medal}</span>
-            <span class="fr-nick">${escapeHtml(p.nick)} ${penaltyBadge}</span>
-            <span class="fr-solved">${p.solvedCount || 0}문제 정답</span>
+            <span class="fr-nick">${escapeHtml(p.nick)}</span>
             <strong class="fr-score">${p.score}점</strong>
           </div>
         `;
