@@ -40,8 +40,11 @@
       <div id="panel-create" class="tab-panel">
         <form id="form-create" autocomplete="off">
           <div class="field-group">
-            <label for="create-nick">내 닉네임</label>
-            <input type="text" id="create-nick" placeholder="예: 피카소, 다빈치" maxlength="12" required>
+            <label for="create-nick">내 닉네임 (자동 생성됨 · 수정 가능)</label>
+            <div class="input-with-btn">
+              <input type="text" id="create-nick" placeholder="예: 붓질하는 브로콜리, 잠꼬대하는 다빈치" maxlength="16" required>
+              <button type="button" id="btn-regen-create-nick" class="btn-secondary btn-sm">🎲 랜덤</button>
+            </div>
           </div>
 
           <div class="field-row">
@@ -99,8 +102,11 @@
       <div id="panel-join" class="tab-panel hidden">
         <form id="form-join" autocomplete="off">
           <div class="field-group">
-            <label for="join-nick">내 닉네임</label>
-            <input type="text" id="join-nick" placeholder="게임에서 표시할 닉네임" maxlength="12" required>
+            <label for="join-nick">내 닉네임 (자동 생성됨 · 수정 가능)</label>
+            <div class="input-with-btn">
+              <input type="text" id="join-nick" placeholder="예: 물감먹는 카피바라, 피클담그는 다빈치" maxlength="16" required>
+              <button type="button" id="btn-regen-join-nick" class="btn-secondary btn-sm">🎲 랜덤</button>
+            </div>
           </div>
 
           <div class="field-row">

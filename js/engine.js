@@ -126,6 +126,80 @@
     return out;
   }
 
+  /**
+   * 'XX하는 다빈치', '물감먹는 브로콜리', '잠꼬대하는 카피바라' 형태의
+   * 수식어 + 명사(화가/야채/동물) 조합 랜덤 닉네임을 생성한다.
+   */
+  const NICK_PREFIXES = [
+    "붓질하는",
+    "잠꼬대하는",
+    "물감먹는",
+    "밤새춤추는",
+    "피클담그는",
+    "삼각형깎는",
+    "눈치보는",
+    "초성만노리는",
+    "길잃은",
+    "신들린",
+    "배고픈",
+    "우주에서온",
+    "점찍는",
+    "낮잠자는",
+    "번개맞은",
+    "해맑은",
+    "고민하는",
+    "산책하는",
+    "추상화그리는",
+    "정답외치는",
+  ];
+
+  const NICK_NOUNS = [
+    // 화가 및 인물
+    "다빈치",
+    "피카소",
+    "반고흐",
+    "뭉크",
+    "달리",
+    "베르메르",
+    "모네",
+    // 야채 및 채소
+    "브로콜리",
+    "피클",
+    "방울토마토",
+    "파프리카",
+    "감자",
+    "고구마",
+    "당근",
+    "아보카도",
+    "가지",
+    "양파",
+    "완두콩",
+    "옥수수",
+    "표고버섯",
+    // 동물
+    "쿼카",
+    "카피바라",
+    "수달",
+    "알파카",
+    "펭귄",
+    "너구리",
+    "고슴도치",
+    "오리너구리",
+    "미어캣",
+    "햄스터",
+    "나무늘보",
+    "두더지",
+    "뱁새",
+    "다람쥐",
+    "해파리",
+  ];
+
+  function generateRandomNickname() {
+    const p = NICK_PREFIXES[Math.floor(Math.random() * NICK_PREFIXES.length)];
+    const n = NICK_NOUNS[Math.floor(Math.random() * NICK_NOUNS.length)];
+    return `${p} ${n}`;
+  }
+
   const QuizEngine = {
     normalizeText,
     levenshtein,
@@ -134,6 +208,7 @@
     calculateScore,
     hashRoomPassword,
     generateRoomCode,
+    generateRandomNickname,
   };
 
   if (typeof module !== "undefined" && module.exports) {

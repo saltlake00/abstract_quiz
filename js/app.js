@@ -49,12 +49,14 @@
   const $ = (id) => document.getElementById(id);
 
   function init() {
-    // 저장된 닉네임 복원
-    const savedNick = localStorage.getItem("aq_nick") || "";
-    if (savedNick) {
-      $("create-nick").value = savedNick;
-      $("join-nick").value = savedNick;
+    // 탭별 기본 랜덤 닉네임 자동 채우기 (수식어 + 화가/야채/동물)
+    let initialNick = sessionStorage.getItem("aq_tab_nick") || "";
+    if (!initialNick) {
+      initialNick = window.QuizEngine.generateRandomNickname();
+      sessionStorage.setItem("aq_tab_nick", initialNick);
     }
+    $("create-nick").value = initialNick;
+    $("join-nick").value = initialNick;
 
     // 초기 방 코드 생성
     $("create-room-code").value = window.QuizEngine.generateRoomCode(5);
@@ -78,11 +80,22 @@
     $("panel-join").classList.toggle("hidden", tab !== "join");
   }
 
+  function rollNewNickname() {
+    const newNick = window.QuizEngine.generateRandomNickname();
+    sessionStorage.setItem("aq_tab_nick", newNick);
+    $("create-nick").value = newNick;
+    $("join-nick").value = newNick;
+  }
+
   function bindEvents() {
     // 홈 탭 전환
     document.querySelectorAll(".tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => switchHomeTab(btn.dataset.tab));
     });
+
+    // 랜덤 닉네임 다시 뽑기 버튼
+    $("btn-regen-create-nick").addEventListener("click", rollNewNickname);
+    $("btn-regen-join-nick").addEventListener("click", rollNewNickname);
 
     // 방 코드 새로고침
     $("btn-regen-code").addEventListener("click", () => {
@@ -117,7 +130,7 @@
     // 혼자 바로 연습하기 버튼
     $("btn-solo-start").addEventListener("click", () => {
       if (!$("create-nick").value.trim()) {
-        $("create-nick").value = "예술탐정";
+        $("create-nick").value = window.QuizEngine.generateRandomNickname();
       }
       handleCreateRoom(true);
     });
@@ -243,7 +256,7 @@
       },
       onJoinRequest: ({ uid, nick }) => {
         // 닉네임 중복 방지 처리
-        let cleanNick = (nick || "참가자").trim().slice(0, 12);
+        let cleanNick = (nick || window.QuizEngine.generateRandomNickname()).trim().slice(0, 16);
         const existingNicks = Object.values(roomState.players)
           .filter((p) => p.uid !== uid)
           .map((p) => p.nick);

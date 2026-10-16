@@ -68,6 +68,11 @@ const hWrong = Engine.hashRoomPassword('9999', 'AB123');
 assertTest('password_hash_open', hOpen === '', 'Empty password yields empty hash');
 assertTest('password_hash_match', hLock1.length === 16 && hLock1 === hLock2 && hLock1 !== hWrong, `hash=${hLock1}`);
 
+// 6. 랜덤 닉네임 생성 검증
+const sampleNicks = Array.from({length: 5}, () => Engine.generateRandomNickname());
+const validFormat = sampleNicks.every(n => typeof n === 'string' && n.includes(' ') && n.length >= 4 && n.length <= 16);
+assertTest('random_nickname_format', validFormat, sampleNicks.join(' | '));
+
 console.log(JSON.stringify(results));
 """
     js_files = ["data/questions.js", "js/engine.js", "js/net.js", "js/app.js"]
