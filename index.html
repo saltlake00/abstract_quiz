@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="robots" content="noindex">
+  <title>추상화 그림맞추기 온라인 — 도형 아트 퀴즈</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 상단 글로벌 네비게이션 -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-icon">🔺</span>
+        <div>
+          <h1>추상화 그림맞추기 온라인</h1>
+          <p class="brand-sub">도형이 쌓이며 드러나는 실시간 멀티 퀴즈</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="net-status" class="net-pill" data-mode="ready">무료 클라우드 준비됨</span>
+        <button type="button" id="btn-open-config" class="btn-ghost btn-sm" title="네트워크/서버 설정">⚙️ 연동 설정</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. 홈 화면 (방 만들기 / 방 참가하기) -->
+  <main id="screen-home" class="home-wrap">
+    <section class="home-card">
+      <div class="tab-bar" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="create">✨ 방 만들기</button>
+        <button type="button" class="tab-btn" data-tab="join">🚪 방 코드로 입장</button>
+      </div>
+
+      <div id="home-alert" class="alert-box hidden"></div>
+
+      <!-- 방 만들기 패널 -->
+      <div id="panel-create" class="tab-panel">
+        <form id="form-create" autocomplete="off">
+          <div class="field-group">
+            <label for="create-nick">내 닉네임</label>
+            <input type="text" id="create-nick" placeholder="예: 피카소, 다빈치" maxlength="12" required>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-1">
+              <label for="create-room-code">방 코드 (공유용)</label>
+              <div class="input-with-btn">
+                <input type="text" id="create-room-code" maxlength="8" required>
+                <button type="button" id="btn-regen-code" class="btn-secondary btn-sm">🎲 변경</button>
+              </div>
+            </div>
+
+            <div class="field-group flex-1">
+              <label for="create-password">방 비밀번호 (선택)</label>
+              <input type="password" id="create-password" placeholder="비워두면 공개방" maxlength="16">
+            </div>
+          </div>
+          <p id="pw-status-hint" class="pw-hint open">🌐 공개 방 (방 코드만으로 즉시 입장)</p>
+
+          <div class="field-row three-cols">
+            <div class="field-group">
+              <label for="create-category">문제 분야</label>
+              <select id="create-category">
+                <option value="전체">전체 (명화+게임+애니 15선)</option>
+                <option value="명화">명화 (5선)</option>
+                <option value="게임">게임 캐릭터 (5선)</option>
+                <option value="애니">애니 캐릭터 (5선)</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="create-rounds">라운드 수</label>
+              <select id="create-rounds">
+                <option value="5" selected>5 라운드</option>
+                <option value="10">10 라운드</option>
+                <option value="15">15 라운드 (전체)</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="create-duration">그림 공개 시간</label>
+              <select id="create-duration">
+                <option value="25">25초 (스피드)</option>
+                <option value="30" selected>30초 (표준)</option>
+                <option value="40">40초 (여유)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="home-btn-row">
+            <button type="submit" class="btn-primary btn-lg flex-2">방 만들고 대기실 열기</button>
+            <button type="button" id="btn-solo-start" class="btn-accent btn-lg flex-1">혼자 바로 시작</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 방 참가하기 패널 -->
+      <div id="panel-join" class="tab-panel hidden">
+        <form id="form-join" autocomplete="off">
+          <div class="field-group">
+            <label for="join-nick">내 닉네임</label>
+            <input type="text" id="join-nick" placeholder="게임에서 표시할 닉네임" maxlength="12" required>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-1">
+              <label for="join-room-code">입장할 방 코드</label>
+              <input type="text" id="join-room-code" placeholder="예: AB39K" maxlength="8" style="text-transform:uppercase" required>
+            </div>
+            <div class="field-group flex-1">
+              <label for="join-password">방 비밀번호 (잠긴 방일 때)</label>
+              <input type="password" id="join-password" placeholder="공개방은 비워두세요" maxlength="16">
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary btn-lg full-width">방 입장하기</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 게임 규칙 요약 카드 -->
+    <section class="rules-card">
+      <h2>🎯 게임 방법</h2>
+      <div class="rules-grid">
+        <div class="rule-item">
+          <strong>1. 모두가 같은 화면 공유</strong>
+          <p>도형 1개부터 260개까지 실시간으로 쌓이며 추상화가 점차 원래 그림으로 드러납니다.</p>
+        </div>
+        <div class="rule-item">
+          <strong>2. 실시간 채팅 & 스포 방지</strong>
+          <p>오답은 모두의 채팅창에 그대로 공개되고, 정답은 자동으로 가려지며 점수가 부여됩니다.</p>
+        </div>
+        <div class="rule-item">
+          <strong>3. 빠를수록 높은 점수</strong>
+          <p>적은 도형 수에서 먼저 맞힐수록 최대 130점(기본 100 + 1등 보너스 30)을 획득합니다.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 2. 방 내부 화면 (대기실 + 게임 스테이지 + 실시간 채팅/점수판 통합) -->
+  <main id="screen-room" class="room-wrap hidden">
+    <!-- 상단 방 정보 바 -->
+    <section class="room-bar">
+      <div class="room-bar-left">
+        <span class="room-code-box">방 코드: <strong id="room-code-display">-----</strong></span>
+        <span id="room-pw-badge" class="badge badge-open">🌐 공개방</span>
+      </div>
+      <div class="room-bar-right">
+        <button type="button" id="btn-copy-link" class="btn-secondary btn-sm">🔗 초대 링크 복사</button>
+        <button type="button" id="btn-open-guest-tab" class="btn-secondary btn-sm" title="새 탭에서 게스트로 접속하여 멀티플레이를 바로 시험합니다">🧪 게스트 테스트 창 열기</button>
+        <button type="button" id="btn-leave-room" class="btn-danger btn-sm">나가기</button>
+      </div>
+    </section>
+
+    <div class="room-grid">
+      <!-- 왼쪽/중앙 메인 스테이지 (모두가 함께 보는 화면) -->
+      <section class="stage-col">
+        <!-- A. 대기실 스테이지 -->
+        <div id="stage-lobby" class="stage-box">
+          <div class="stage-header">
+            <h2>대기실 — 참가자 준비 현황</h2>
+            <p class="stage-sub">방장이 설정을 확인하고 게임을 시작하면 모든 참가자 화면에서 동시에 시작됩니다.</p>
+          </div>
+
+          <div class="lobby-settings-bar">
+            <div class="ls-item">
+              <label for="lobby-category">분야</label>
+              <select id="lobby-category">
+                <option value="전체">전체 (15선)</option>
+                <option value="명화">명화 (5선)</option>
+                <option value="게임">게임 (5선)</option>
+                <option value="애니">애니 (5선)</option>
+              </select>
+            </div>
+            <div class="ls-item">
+              <label for="lobby-rounds">라운드</label>
+              <select id="lobby-rounds">
+                <option value="5">5 라운드</option>
+                <option value="10">10 라운드</option>
+                <option value="15">15 라운드</option>
+              </select>
+            </div>
+            <div class="ls-item">
+              <label for="lobby-duration">시간</label>
+              <select id="lobby-duration">
+                <option value="25">25초</option>
+                <option value="30">30초</option>
+                <option value="40">40초</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="lobby-player-list" class="lobby-player-grid"></div>
+
+          <div class="lobby-action-bar">
+            <button type="button" id="btn-ready" class="btn-accent btn-lg hidden">준비 완료 (Ready)</button>
+            <button type="button" id="btn-start-game" class="btn-primary btn-lg">🚀 게임 시작하기</button>
+          </div>
+        </div>
+
+        <!-- B. 카운트다운 스테이지 -->
+        <div id="stage-countdown" class="stage-box countdown-box hidden">
+          <p id="cd-round-label" class="cd-round">ROUND 1 / 5</p>
+          <p id="cd-category-label" class="cd-cat">분야: 명화</p>
+          <div id="cd-number" class="cd-num">3</div>
+          <p class="cd-desc">잠시 후 도형이 하나씩 그려집니다!</p>
+        </div>
+
+        <!-- C. 본 게임 추상화 캔버스 스테이지 -->
+        <div id="stage-game" class="stage-box game-box hidden">
+          <div class="game-hud">
+            <div class="hud-left">
+              <span id="game-round-badge" class="hud-pill primary">ROUND 1 / 5</span>
+              <span id="game-cat-badge" class="hud-pill cat">명화</span>
+            </div>
+            <div class="hud-stats">
+              <span id="stat-shapes" class="stat-chip">도형 1 / 260</span>
+              <span id="stat-time" class="stat-chip">0.0s / 30s</span>
+              <span id="stat-potential" class="stat-chip score-chip">지금 맞히면 +130점</span>
+            </div>
+          </div>
+
+          <div class="time-progress-track">
+            <div id="time-progress-fill" class="time-progress-fill"></div>
+          </div>
+
+          <div id="hint-bar" class="hint-bar">
+            🎨 도형이 쌓이며 추상화가 구체화됩니다. 채팅창에 정답을 입력해 보세요!
+          </div>
+
+          <div class="canvas-stage-area">
+            <div id="svg-canvas-wrap" class="svg-canvas-wrap"></div>
+
+            <!-- 라운드 종료 시 정답 공개 오버레이 배너 -->
+            <div id="round-answer-banner" class="answer-banner hidden">
+              <div class="ab-info">
+                <strong id="answer-title">정답: 모나리자</strong>
+                <span id="answer-desc">레오나르도 다빈치</span>
+              </div>
+              <button type="button" id="btn-next-round" class="btn-primary btn-sm">다음 라운드 ▶</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- D. 최종 순위 결과 스테이지 -->
+        <div id="stage-final" class="stage-box final-box hidden">
+          <div class="stage-header">
+            <h2>🏆 최종 결과 및 순위</h2>
+            <p class="stage-sub">모든 라운드가 끝났습니다! 꼴찌에게는 전설의 피클팝 벌칙이 기다립니다.</p>
+          </div>
+          <div id="final-ranking-list" class="final-ranking-list"></div>
+          <div class="lobby-action-bar">
+            <button type="button" id="btn-back-lobby" class="btn-primary btn-lg">대기실로 돌아가기 (한 판 더)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 오른쪽/하단 실시간 점수판 & 멀티 채팅창 -->
+      <aside class="chat-col">
+        <div class="side-panel">
+          <div class="panel-title-row">
+            <h3>📊 실시간 점수판</h3>
+          </div>
+          <div id="live-scoreboard" class="live-scoreboard"></div>
+        </div>
+
+        <div class="side-panel chat-panel">
+          <div class="panel-title-row">
+            <h3>💬 실시간 정답 & 채팅</h3>
+            <span class="chat-sub-hint">정답은 자동으로 가려집니다</span>
+          </div>
+          <div id="chat-log" class="chat-log"></div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="정답 또는 채팅 입력 후 Enter" maxlength="60" autocomplete="off">
+            <button type="button" id="btn-send-chat" class="btn-primary">전송</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- 선택적 Firebase 연동 설정 모달 -->
+  <div id="modal-config" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h3>⚙️ 실시간 연동 서버 설정</h3>
+      <p class="modal-desc">
+        기본값으로 <strong>무료 WebRTC 클라우드(PeerJS) + 로컬 멀티탭 채널</strong>이 자동 동작하며 별도 설정이 필요 없습니다.<br>
+        만약 개인 <strong>Firebase Realtime Database</strong>를 추가로 연결하려면 아래에 데이터베이스 주소(URL)를 입력하세요.
+      </p>
+      <div class="field-group">
+        <label for="config-fb-url">Firebase Realtime DB URL (선택)</label>
+        <input type="url" id="config-fb-url" placeholder="https://your-project-default-rtdb.firebaseio.com">
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="btn-close-config" class="btn-secondary">닫기</button>
+        <button type="button" id="btn-save-config" class="btn-primary">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- PeerJS 무료 클라우드 브로커 SDK (CDN) + 로컬 모듈 -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="data/questions.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+﻿test_name,passed,detail
+syntax_data/questions.js,True,OK
+syntax_js/engine.js,True,OK
+syntax_js/net.js,True,OK
+syntax_js/app.js,True,OK
+dataset_count_15,True,count=15
+dataset_polygons_260,True,All 15 items have 260 polygons
+norm_korean_punct,True,紐⑤굹由ъ옄
+answer_exact_match,True,Exact normalized match
+answer_typo_match_long,True,1-char typo allowed on length>=5
+answer_wrong_reject,True,Wrong answer rejected
+visible_count_monotonic,True,"k=[1, 34, 122, 260]"
+score_early_vs_late,True,"early=124, late=62"
+score_rank_bonus,True,"1st=124, 2nd=109"
+password_hash_open,True,Empty password yields empty hash
+password_hash_match,True,hash=e4156883b2637afe
