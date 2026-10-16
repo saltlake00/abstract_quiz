@@ -562,19 +562,23 @@ button:active {
 /* 게임 플레이 스테이지 */
 .game-hud {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
   margin-bottom: 10px;
 }
 
-.hud-left,
-.hud-stats {
+.hud-left {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.hud-stats {
+  display: grid;
+  grid-template-columns: 125px 115px minmax(0, 1fr);
+  gap: 6px;
 }
 
 .hud-pill {
@@ -597,6 +601,8 @@ button:active {
 .stat-chip {
   font-size: 13px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   background: var(--bg-input);
   border: 1px solid var(--border);
   padding: 5px 10px;
@@ -958,5 +964,18 @@ button:active {
   }
   .svg-canvas-wrap {
     width: min(100%, 260px);
+  }
+}
+
+@media (max-width: 600px) {
+  .hud-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hud-stats .score-chip {
+    grid-column: 1 / -1;
+  }
+  .hud-stats .stat-chip {
+    font-size: 12px;
+    padding: 5px 8px;
   }
 }
