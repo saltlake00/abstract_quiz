@@ -80,14 +80,14 @@ console.log(JSON.stringify(results));
 
     for rel in js_files:
         full = os.path.join(BASE_DIR, rel)
-        proc = subprocess.run(["node", "--check", full], capture_output=True, text=True)
+        proc = subprocess.run(["node", "--check", full], capture_output=True, text=True, encoding="utf-8")
         rows.append({
             "test_name": f"syntax_{rel}",
             "passed": proc.returncode == 0,
             "detail": "OK" if proc.returncode == 0 else proc.stderr.strip(),
         })
 
-    proc = subprocess.run(["node", "-e", node_script], cwd=BASE_DIR, capture_output=True, text=True)
+    proc = subprocess.run(["node", "-e", node_script], cwd=BASE_DIR, capture_output=True, text=True, encoding="utf-8")
     if proc.returncode != 0:
         raise RuntimeError(f"Node test failed: {proc.stderr}")
 

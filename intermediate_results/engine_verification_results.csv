@@ -5,7 +5,7 @@ syntax_js/net.js,True,OK
 syntax_js/app.js,True,OK
 dataset_count_15,True,count=15
 dataset_polygons_260,True,All 15 items have 260 polygons
-norm_korean_punct,True,紐⑤굹由ъ옄
+norm_korean_punct,True,모나리자
 answer_exact_match,True,Exact normalized match
 answer_typo_match_long,True,1-char typo allowed on length>=5
 answer_wrong_reject,True,Wrong answer rejected
@@ -14,3 +14,4 @@ score_early_vs_late,True,"early=124, late=62"
 score_rank_bonus,True,"1st=124, 2nd=109"
 password_hash_open,True,Empty password yields empty hash
 password_hash_match,True,hash=e4156883b2637afe
+random_nickname_format,True,피클담그는 피카소 | 신들린 아보카도 | 산책하는 브로콜리 | 추상화그리는 당근 | 피클담그는 고구마
