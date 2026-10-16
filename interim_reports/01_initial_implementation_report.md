@@ -15,10 +15,10 @@
 * **방법**: 경과 시간 비율 $(t/T)$에 지수 $\gamma = 1.85$를 적용한 $k(t) = \lfloor N \cdot (t/T)^{1.85} \rfloor$ 곡선을 적용했습니다. 30초 기준 10초 시점에 34개, 20초 시점에 122개, 30초 시점에 260개가 공개되어 초반 추론 재미와 후반 힌트 구간이 균형을 이룹니다.
 
 ### 2.3 무료 온라인 통신 구조 및 비밀번호 인증
-* **방법 선택**: 별도 회원가입이나 유료 서버 없이 즉시 동작하도록 호스트 권위(Authoritative Host) 구조의 WebRTC(PeerJS 무료 클라우드)와 동일 기기 다중 탭용 `BroadcastChannel`을 동시 구동하고, 선택적으로 Firebase Realtime Database URL을 입력해 연동할 수 있도록 `js/net.js`를 구현했습니다.
+* **방법 선택**: 별도 회원가입이나 유료 서버 없이 즉시 동작하도록 호스트 권위(Authoritative Host) 구조의 **MQTT over WSS 실시간 웹소켓 중계(`wss://broker.emqx.io:8084/mqtt`)**, **WebRTC(PeerJS 무료 클라우드)**, 동일 기기 다중 탭용 **`BroadcastChannel`**을 동시에 구동하고 고유 메시지 식별자(`_mid`)로 중복 패킷을 제거하도록 `js/net.js`를 구현했습니다. 이를 통해 스마트폰 LTE 대칭형 NAT(CGNAT)나 공유기 기기 격리(AP Isolation) 환경에서도 100% 연결이 보장됩니다.
 * **비밀번호 보호 검증**: 방 생성 시 설정한 비밀번호를 방 코드와 결합하여 64비트 해시(`js/engine.js`의 `hashRoomPassword`)로 변환하고, 게스트 입장 요청(`JOIN_REQ`) 시 호스트가 해시 일치 여부를 검증하여 승인(`AUTH_OK`) 또는 거부(`AUTH_FAIL`)하도록 구현했습니다.
-* **자동화 테스트 검증**: `scripts/02_verify_quiz_engine.py`를 통해 문법 검사 4건과 핵심 규칙 단위 시험 11건(총 15건)이 모두 통과함을 확인하고 `intermediate_results/engine_verification_results.csv`에 기록했습니다.
+* **자동화 테스트 및 배포 검증**: `scripts/02_verify_quiz_engine.py`를 통해 문법 검사 4건과 핵심 규칙 단위 시험 11건(총 15건)이 모두 통과함을 확인하고 `intermediate_results/engine_verification_results.csv`에 기록했습니다. 이후 GitHub 원격 저장소(`saltlake00/abstract_quiz`)를 생성하고 GitHub Pages 배포를 활성화했습니다.
 
 ## 3. 한계점 및 향후 확장 과제
-1. **호스트 브라우저 의존성**: 기본 무료 WebRTC 모드에서는 방장(호스트)의 브라우저가 방 상태를 관리하므로 방장 탭이 완전히 닫히면 방이 종료됩니다. 장시간 안정적인 방 유지를 원할 경우 상단 연동 설정에서 무료 Firebase Realtime Database URL을 연결할 수 있습니다.
+1. **호스트 브라우저 의존성**: 기본 무료 클라우드(MQTT WSS 및 WebRTC) 모드에서는 방장(호스트)의 브라우저가 방 상태를 관리하므로 방장 탭이 완전히 닫히면 방이 종료됩니다. 장시간 안정적인 방 유지를 원할 경우 상단 연동 설정에서 무료 Firebase Realtime Database URL을 연결할 수 있습니다.
 2. **문제 풀 확장**: 현재 기본 세트는 명화 5선, 게임 5선, 애니 5선 총 15문항이며, `scripts/01_build_quiz_dataset.py`에 원본 이미지를 추가하여 손쉽게 문항 수를 확장할 수 있습니다.
