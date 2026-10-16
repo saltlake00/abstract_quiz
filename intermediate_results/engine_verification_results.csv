@@ -14,4 +14,4 @@ score_early_vs_late,True,"early=124, late=62"
 score_rank_bonus,True,"1st=124, 2nd=109"
 password_hash_open,True,Empty password yields empty hash
 password_hash_match,True,hash=e4156883b2637afe
-random_nickname_format,True,피클담그는 피카소 | 신들린 아보카도 | 산책하는 브로콜리 | 추상화그리는 당근 | 피클담그는 고구마
+random_nickname_format,True,산책하는 다빈치 | 발버둥치는 단호박 | 선글라스낀 문어 | 해맑게 번개맞은 표고버섯 | 잠결에 피클담그는 카멜레온

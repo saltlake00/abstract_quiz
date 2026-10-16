@@ -42,7 +42,7 @@
           <div class="field-group">
             <label for="create-nick">내 닉네임 (자동 생성됨 · 수정 가능)</label>
             <div class="input-with-btn">
-              <input type="text" id="create-nick" placeholder="예: 붓질하는 브로콜리, 잠꼬대하는 다빈치" maxlength="16" required>
+              <input type="text" id="create-nick" placeholder="예: 새벽마다 붓질하는 브로콜리, 몰래 잠꼬대하는 다빈치" maxlength="24" required>
               <button type="button" id="btn-regen-create-nick" class="btn-secondary btn-sm">🎲 랜덤</button>
             </div>
           </div>
@@ -104,7 +104,7 @@
           <div class="field-group">
             <label for="join-nick">내 닉네임 (자동 생성됨 · 수정 가능)</label>
             <div class="input-with-btn">
-              <input type="text" id="join-nick" placeholder="예: 물감먹는 카피바라, 피클담그는 다빈치" maxlength="16" required>
+              <input type="text" id="join-nick" placeholder="예: 배고파서 물감먹는 카피바라, 눈치보며 피클담그는 다빈치" maxlength="24" required>
               <button type="button" id="btn-regen-join-nick" class="btn-secondary btn-sm">🎲 랜덤</button>
             </div>
           </div>
@@ -308,12 +308,16 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <!-- MQTT over WSS & PeerJS 무료 클라우드 브로커 SDK (CDN) + 로컬 모듈 -->
+  <!-- MQTT over WSS & PeerJS 무료 클라우드 브로커 SDK (CDN) + 로컬 모듈 (캐시 방지 쿼리 포함) -->
   <script src="https://unpkg.com/mqtt@5.10.3/dist/mqtt.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="data/questions.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/net.js"></script>
-  <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var v = Date.now();
+      ["data/questions.js", "js/engine.js", "js/net.js", "js/app.js"].forEach(function (src) {
+        document.write('<script src="' + src + '?t=' + v + '"><\/script>');
+      });
+    })();
+  </script>
 </body>
 </html>

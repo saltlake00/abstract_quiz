@@ -49,12 +49,8 @@
   const $ = (id) => document.getElementById(id);
 
   function init() {
-    // 탭별 기본 랜덤 닉네임 자동 채우기 (수식어 + 화가/야채/동물)
-    let initialNick = sessionStorage.getItem("aq_tab_nick") || "";
-    if (!initialNick) {
-      initialNick = window.QuizEngine.generateRandomNickname();
-      sessionStorage.setItem("aq_tab_nick", initialNick);
-    }
+    // 접속 및 새로고침마다 새로운 랜덤 닉네임 자동 생성 (앞 수식어 + 행동 수식어 + 화가/야채/동물)
+    const initialNick = window.QuizEngine.generateRandomNickname();
     $("create-nick").value = initialNick;
     $("join-nick").value = initialNick;
 
@@ -81,8 +77,13 @@
   }
 
   function rollNewNickname() {
-    const newNick = window.QuizEngine.generateRandomNickname();
-    sessionStorage.setItem("aq_tab_nick", newNick);
+    const prev = $("create-nick").value;
+    let newNick = window.QuizEngine.generateRandomNickname();
+    let tries = 0;
+    while (newNick === prev && tries < 5) {
+      newNick = window.QuizEngine.generateRandomNickname();
+      tries++;
+    }
     $("create-nick").value = newNick;
     $("join-nick").value = newNick;
   }
@@ -256,7 +257,7 @@
       },
       onJoinRequest: ({ uid, nick }) => {
         // 닉네임 중복 방지 처리
-        let cleanNick = (nick || window.QuizEngine.generateRandomNickname()).trim().slice(0, 16);
+        let cleanNick = (nick || window.QuizEngine.generateRandomNickname()).trim().slice(0, 24);
         const existingNicks = Object.values(roomState.players)
           .filter((p) => p.uid !== uid)
           .map((p) => p.nick);
