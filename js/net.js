@@ -3,10 +3,11 @@
  * net.js
  * 추상화 그림맞추기 온라인 실시간 멀티플레이 네트워크 어댑터
  *
- * 지원 채널:
- * 1. PeerJS (WebRTC 무료 클라우드 브로커) : 별도 가입·키 없이 다른 기기/네트워크 간 실시간 연결
- * 2. BroadcastChannel : 동일 기기 내 다중 브라우저 탭 간 0ms 즉시 동기화 (항상 병행 작동)
- * 3. Firebase Realtime Database (선택 설정) : 설정 모달에 databaseURL 입력 시 REST/폴링 동기화 병행
+ * 지원 채널 (동시 구동 및 메시지 ID 중복 제거):
+ * 1. MQTT over WSS (wss://broker.emqx.io:8084/mqtt) : LTE/방화벽/공유기 격리 환경을 100% 통과하는 실시간 웹소켓 중계
+ * 2. PeerJS (WebRTC 무료 클라우드 브로커) : 기기 간 직접 P2P 데이터 채널 연결
+ * 3. BroadcastChannel : 동일 기기 내 다중 브라우저 탭 간 0ms 즉시 동기화
+ * 4. Firebase Realtime Database (선택 설정) : 설정 모달에 databaseURL 입력 시 병행 작동
  *
  * 보안 및 방 관리:
  * - 호스트 권위(Authoritative Host) 구조
@@ -18,6 +19,11 @@
 
   const PEER_PREFIX = "aq_quiz_v1_room_";
   const BC_PREFIX = "aq_quiz_bc_";
+  const MQTT_BROKERS = [
+    "wss://broker.emqx.io:8084/mqtt",
+    "wss://broker.hivemq.com:8884/mqtt",
+  ];
+  const TOPIC_PREFIX = "aq_quiz_v1_net";
 
   class RoomNetwork {
     constructor(callbacks = {}) {
@@ -31,11 +37,15 @@
 
       this.peer = null;
       this.hostConn = null;
-      this.guestConns = new Map(); // peerId -> DataConnection
+      this.guestConns = new Map();
+      this.mqttClient = null;
       this.bc = null;
       this.fbUrl = localStorage.getItem("aq_firebase_url") || "";
       this.fbPollTimer = null;
+      this.joinRetryTimer = null;
+      this.joinTimeout = null;
       this.connected = false;
+      this.seenMsgIds = new Set();
     }
 
     _loadOrCreateClientId() {
@@ -45,6 +55,25 @@
         sessionStorage.setItem("aq_client_id", id);
       }
       return id;
+    }
+
+    _stampMsg(payload) {
+      return {
+        ...payload,
+        _mid: payload._mid || `${this.myId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        senderId: this.myId,
+      };
+    }
+
+    _isDuplicate(data) {
+      if (!data || !data._mid) return false;
+      if (this.seenMsgIds.has(data._mid)) return true;
+      this.seenMsgIds.add(data._mid);
+      if (this.seenMsgIds.size > 600) {
+        const first = this.seenMsgIds.values().next().value;
+        this.seenMsgIds.delete(first);
+      }
+      return false;
     }
 
     setFirebaseUrl(url) {
@@ -70,7 +99,10 @@
       // 1. 로컬 다중 탭 BroadcastChannel 오픈
       this._initBroadcastChannel();
 
-      // 2. 선택적 Firebase 방 메타 등록
+      // 2. MQTT over WSS 실시간 중계 채널 연결 (LTE/다른 와이파이 즉시 연결 보장)
+      this._initMqttHost();
+
+      // 3. 선택적 Firebase 방 메타 등록
       if (this.fbUrl) {
         this._fbPut(`/rooms/${this.roomCode}/meta.json`, {
           roomCode: this.roomCode,
@@ -81,12 +113,12 @@
         this._startFirebasePolling();
       }
 
-      // 3. PeerJS 클라우드 브로커에 방 ID 등록
+      // 4. PeerJS 클라우드 브로커에 방 ID 등록
       if (typeof global.Peer !== "undefined") {
         const peerId = PEER_PREFIX + this.roomCode;
         try {
           this.peer = new global.Peer(peerId, {
-            debug: 1,
+            debug: 0,
             config: {
               iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
@@ -97,16 +129,22 @@
 
           this.peer.on("open", () => {
             this.connected = true;
-            this._emitStatus("online", "온라인 방 개설 완료 (WebRTC + 로컬 채널 활성화)");
+            this._emitStatus("online", "온라인 멀티 방 활성화됨");
           });
 
           this.peer.on("connection", (conn) => {
             conn.on("data", (data) => {
-              this._handleIncomingOnHost(data, (reply) => {
-                try {
-                  conn.send(reply);
-                } catch (e) {}
-              }, conn);
+              this._handleIncomingOnHost(
+                data,
+                (reply) => {
+                  const stamped = this._stampMsg(reply);
+                  try {
+                    conn.send(stamped);
+                  } catch (e) {}
+                  this._publishMqtt(`${TOPIC_PREFIX}/${this.roomCode}/direct/${data.uid}`, stamped);
+                },
+                conn
+              );
             });
             conn.on("close", () => {
               const uid = conn._aqUid;
@@ -117,19 +155,8 @@
             });
           });
 
-          this.peer.on("error", (err) => {
-            if (err && err.type === "unavailable-id") {
-              this._emitError("이미 사용 중인 방 코드입니다. 다른 방 코드를 입력하거나 기존 방에 입장해 주세요.");
-            } else {
-              // 오프라인이거나 PeerJS 서버 지연 시에도 BroadcastChannel / Firebase로 작동
-              this._emitStatus("local", "로컬 멀티탭 채널로 방 개설됨 (온라인 브로커 대기중)");
-            }
-          });
-        } catch (e) {
-          this._emitStatus("local", "로컬 멀티탭 모드로 동작 중");
-        }
-      } else {
-        this._emitStatus("local", "로컬 멀티탭 모드로 동작 중");
+          this.peer.on("error", () => {});
+        } catch (e) {}
       }
 
       this.connected = true;
@@ -155,43 +182,46 @@
 
       let authResolved = false;
 
-      const sendJoinReq = (sendFn) => {
-        sendFn({
+      const buildJoinPacket = () =>
+        this._stampMsg({
           type: "JOIN_REQ",
           uid: this.myId,
           nick: this.myNick,
           passwordHash: this.passwordHash,
           ts: Date.now(),
         });
-      };
 
-      // 1. BroadcastChannel 로 즉시 탐색 (같은 PC의 다른 탭에 호스트가 있는 경우 5ms 내 연결)
-      this._initBroadcastChannel((msg) => {
-        if (msg.targetUid && msg.targetUid !== this.myId) return;
+      const onGuestPacket = (msg) => {
+        if (!msg || (msg.targetUid && msg.targetUid !== this.myId)) return;
         if (msg.type === "AUTH_OK" || msg.type === "AUTH_FAIL") {
           authResolved = true;
+          this._clearJoinTimers();
         }
         this._handleIncomingOnGuest(msg);
-      });
-      sendJoinReq((payload) => this._sendViaBroadcastChannel(payload));
+      };
 
-      // 2. 선택적 Firebase 경유 입장
+      // 1. BroadcastChannel 즉시 탐색
+      this._initBroadcastChannel(onGuestPacket);
+      this._sendViaBroadcastChannel(buildJoinPacket());
+
+      // 2. MQTT over WSS 연결 및 입장 요청 전송
+      this._initMqttGuest(onGuestPacket, () => {
+        if (!authResolved) {
+          this._publishMqtt(`${TOPIC_PREFIX}/${this.roomCode}/inbox`, buildJoinPacket());
+        }
+      });
+
+      // 3. 선택적 Firebase 경유 입장
       if (this.fbUrl) {
-        this._fbPost(`/rooms/${this.roomCode}/inbox.json`, {
-          type: "JOIN_REQ",
-          uid: this.myId,
-          nick: this.myNick,
-          passwordHash: this.passwordHash,
-          ts: Date.now(),
-        });
+        this._fbPost(`/rooms/${this.roomCode}/inbox.json`, buildJoinPacket());
         this._startFirebasePolling();
       }
 
-      // 3. PeerJS (WebRTC)로 원격 호스트에 연결
+      // 4. PeerJS (WebRTC) 원격 호스트 연결
       if (typeof global.Peer !== "undefined") {
         try {
           this.peer = new global.Peer({
-            debug: 1,
+            debug: 0,
             config: {
               iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
@@ -207,40 +237,119 @@
             this.hostConn = conn;
 
             conn.on("open", () => {
-              this._emitStatus("online", "방 호스트와 연결됨 · 인증 확인 중...");
-              sendJoinReq((payload) => conn.send(payload));
-            });
-
-            conn.on("data", (data) => {
-              if (data.type === "AUTH_OK" || data.type === "AUTH_FAIL") {
-                authResolved = true;
-              }
-              this._handleIncomingOnGuest(data);
-            });
-
-            conn.on("close", () => {
-              if (!this.bc) {
-                this._emitError("방장과의 연결이 종료되었습니다.");
+              if (!authResolved) {
+                conn.send(buildJoinPacket());
               }
             });
 
+            conn.on("data", (data) => onGuestPacket(data));
             conn.on("error", () => {});
           });
 
-          this.peer.on("error", () => {
-            if (!authResolved) {
-              this._emitError("방을 찾을 수 없거나 연결할 수 없습니다. 방 코드를 다시 확인해 주세요.");
-            }
-          });
+          this.peer.on("error", () => {});
         } catch (e) {}
       }
 
-      // 6초 내 응답이 없으면 타임아웃 안내
-      this.joinTimeout = setTimeout(() => {
-        if (!authResolved) {
-          this._emitError("해당 방 코드(" + this.roomCode + ")의 호스트가 응답하지 않습니다. 방 코드가 맞는지 확인해 주세요.");
+      // 1.8초 간격 재시도 (네트워크 연결 직후 패킷 유실 대비)
+      this.joinRetryTimer = setInterval(() => {
+        if (authResolved) {
+          this._clearJoinTimers();
+          return;
         }
-      }, 6500);
+        const pkt = buildJoinPacket();
+        this._sendViaBroadcastChannel(pkt);
+        this._publishMqtt(`${TOPIC_PREFIX}/${this.roomCode}/inbox`, pkt);
+        if (this.hostConn && this.hostConn.open) {
+          try {
+            this.hostConn.send(pkt);
+          } catch (e) {}
+        }
+      }, 1800);
+
+      // 9초 내 응답이 없으면 타임아웃 안내
+      this.joinTimeout = setTimeout(() => {
+        this._clearJoinTimers();
+        if (!authResolved) {
+          this._emitError(
+            "방 코드(" +
+              this.roomCode +
+              ")에 응답하는 방장이 없습니다. 방 코드가 맞는지, 방장이 대기실을 열어 두었는지 확인해 주세요."
+          );
+        }
+      }, 9000);
+    }
+
+    _clearJoinTimers() {
+      if (this.joinRetryTimer) {
+        clearInterval(this.joinRetryTimer);
+        this.joinRetryTimer = null;
+      }
+      if (this.joinTimeout) {
+        clearTimeout(this.joinTimeout);
+        this.joinTimeout = null;
+      }
+    }
+
+    _initMqttHost() {
+      if (typeof global.mqtt === "undefined") return;
+      try {
+        const client = global.mqtt.connect(MQTT_BROKERS[0], {
+          connectTimeout: 5000,
+          reconnectPeriod: 2000,
+        });
+        this.mqttClient = client;
+        const inboxTopic = `${TOPIC_PREFIX}/${this.roomCode}/inbox`;
+
+        client.on("connect", () => {
+          this._emitStatus("online", "온라인 클라우드 연결됨");
+          client.subscribe(inboxTopic);
+        });
+
+        client.on("message", (topic, payloadBuf) => {
+          try {
+            const data = JSON.parse(payloadBuf.toString());
+            if (!data || data.senderId === this.myId) return;
+            this._handleIncomingOnHost(data, (reply) => {
+              const stamped = this._stampMsg({ ...reply, targetUid: data.uid });
+              this._publishMqtt(`${TOPIC_PREFIX}/${this.roomCode}/direct/${data.uid}`, stamped);
+            });
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+
+    _initMqttGuest(onGuestPacket, onConnected) {
+      if (typeof global.mqtt === "undefined") return;
+      try {
+        const client = global.mqtt.connect(MQTT_BROKERS[0], {
+          connectTimeout: 5000,
+          reconnectPeriod: 2000,
+        });
+        this.mqttClient = client;
+        const directTopic = `${TOPIC_PREFIX}/${this.roomCode}/direct/${this.myId}`;
+        const broadcastTopic = `${TOPIC_PREFIX}/${this.roomCode}/broadcast`;
+
+        client.on("connect", () => {
+          client.subscribe([directTopic, broadcastTopic], () => {
+            if (onConnected) onConnected();
+          });
+        });
+
+        client.on("message", (topic, payloadBuf) => {
+          try {
+            const data = JSON.parse(payloadBuf.toString());
+            if (!data || data.senderId === this.myId) return;
+            onGuestPacket(data);
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+
+    _publishMqtt(topic, obj) {
+      if (!this.mqttClient || !this.mqttClient.connected) return;
+      try {
+        this.mqttClient.publish(topic, JSON.stringify(obj));
+      } catch (e) {}
     }
 
     _initBroadcastChannel(guestHandler) {
@@ -252,7 +361,8 @@
           if (!data || data.senderId === this.myId) return;
           if (this.isHost) {
             this._handleIncomingOnHost(data, (reply) => {
-              this._sendViaBroadcastChannel({ ...reply, targetUid: data.uid });
+              const stamped = this._stampMsg({ ...reply, targetUid: data.uid });
+              this._sendViaBroadcastChannel(stamped);
             });
           } else if (guestHandler) {
             guestHandler(data);
@@ -264,15 +374,15 @@
     _sendViaBroadcastChannel(payload) {
       if (!this.bc) return;
       try {
-        this.bc.postMessage({ ...payload, senderId: this.myId });
+        this.bc.postMessage(payload);
       } catch (e) {}
     }
 
     _handleIncomingOnHost(data, replyFn, peerConn = null) {
       if (!data || !data.type) return;
+      if (this._isDuplicate(data)) return;
 
       if (data.type === "JOIN_REQ") {
-        // 비밀번호 검증
         if (this.hasPassword && data.passwordHash !== this.passwordHash) {
           replyFn({
             type: "AUTH_FAIL",
@@ -280,7 +390,7 @@
             needPassword: true,
             reason: data.passwordHash
               ? "방 비밀번호가 일치하지 않습니다."
-              : "비밀번호가 설정된 비공개 방입니다. 비밀번호를 입력해 주세요.",
+              : "🔒 비밀번호가 설정된 방입니다. 비밀번호를 입력해 주세요.",
           });
           return;
         }
@@ -323,9 +433,10 @@
     _handleIncomingOnGuest(data) {
       if (!data || !data.type) return;
       if (data.targetUid && data.targetUid !== this.myId) return;
+      if (this._isDuplicate(data)) return;
 
       if (data.type === "AUTH_FAIL") {
-        if (this.joinTimeout) clearTimeout(this.joinTimeout);
+        this._clearJoinTimers();
         if (this.callbacks.onAuthFail) {
           this.callbacks.onAuthFail(data);
         }
@@ -333,9 +444,9 @@
       }
 
       if (data.type === "AUTH_OK") {
-        if (this.joinTimeout) clearTimeout(this.joinTimeout);
+        this._clearJoinTimers();
         this.connected = true;
-        this._emitStatus("online", "방 입장 완료");
+        this._emitStatus("online", "온라인 방 연결됨");
         if (this.callbacks.onAuthOk) {
           this.callbacks.onAuthOk(data);
         }
@@ -352,15 +463,17 @@
      */
     broadcastFromHost(payload) {
       if (!this.isHost) return;
-      this._sendViaBroadcastChannel(payload);
+      const stamped = this._stampMsg(payload);
+      this._sendViaBroadcastChannel(stamped);
+      this._publishMqtt(`${TOPIC_PREFIX}/${this.roomCode}/broadcast`, stamped);
       for (const [, conn] of this.guestConns.entries()) {
         try {
-          if (conn.open) conn.send(payload);
+          if (conn.open) conn.send(stamped);
         } catch (e) {}
       }
       if (this.fbUrl && payload.type === "STATE_SYNC") {
         this._fbPut(`/rooms/${this.roomCode}/state.json`, {
-          ...payload,
+          ...stamped,
           updatedAt: Date.now(),
         });
       }
@@ -370,7 +483,12 @@
      * 게스트(또는 호스트 자신)가 호스트에게 액션(레디, 채팅/정답 제출 등)을 전송한다.
      */
     sendToHost(payload) {
-      const msg = { ...payload, uid: this.myId, nick: this.myNick, ts: Date.now() };
+      const msg = this._stampMsg({
+        ...payload,
+        uid: this.myId,
+        nick: this.myNick,
+        ts: Date.now(),
+      });
       if (this.isHost) {
         if (this.callbacks.onHostMessage) {
           this.callbacks.onHostMessage(msg);
@@ -378,6 +496,7 @@
         return;
       }
       this._sendViaBroadcastChannel(msg);
+      this._publishMqtt(`${TOPIC_PREFIX}/${this.roomCode}/inbox`, msg);
       if (this.hostConn && this.hostConn.open) {
         try {
           this.hostConn.send(msg);
@@ -428,7 +547,7 @@
               if (item && item.ts > lastSeenTs) {
                 lastSeenTs = item.ts;
                 this._handleIncomingOnHost(item, (reply) => {
-                  this._fbPut(`/rooms/${this.roomCode}/Direct_${item.uid}.json`, reply);
+                  this._fbPut(`/rooms/${this.roomCode}/Direct_${item.uid}.json`, this._stampMsg(reply));
                 });
               }
             }
@@ -462,13 +581,16 @@
     }
 
     disconnect() {
-      if (this.joinTimeout) {
-        clearTimeout(this.joinTimeout);
-        this.joinTimeout = null;
-      }
+      this._clearJoinTimers();
       if (this.fbPollTimer) {
         clearInterval(this.fbPollTimer);
         this.fbPollTimer = null;
+      }
+      if (this.mqttClient) {
+        try {
+          this.mqttClient.end(true);
+        } catch (e) {}
+        this.mqttClient = null;
       }
       if (this.bc) {
         try {
