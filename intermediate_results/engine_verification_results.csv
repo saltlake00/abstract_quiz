@@ -14,4 +14,4 @@ score_early_vs_late,True,"early=124, late=62"
 score_rank_bonus,True,"1st=124, 2nd=109"
 password_hash_open,True,Empty password yields empty hash
 password_hash_match,True,hash=e4156883b2637afe
-random_nickname_format,True,산책하는 다빈치 | 발버둥치는 단호박 | 선글라스낀 문어 | 해맑게 번개맞은 표고버섯 | 잠결에 피클담그는 카멜레온
+random_nickname_format,True,초성만보며 고민하는 우파루파 | 눈치보며 광합성하는 애호박 | 물감먹는 애호박 | 노래부르는 개구리 | 우아하게 멍때리는 고구마

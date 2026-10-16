@@ -52,6 +52,7 @@
               <label for="create-room-code">방 코드 (공유용)</label>
               <div class="input-with-btn">
                 <input type="text" id="create-room-code" maxlength="8" required>
+                <button type="button" id="btn-copy-create-code" class="btn-secondary btn-sm" title="방 코드 복사">📋 복사</button>
                 <button type="button" id="btn-regen-code" class="btn-secondary btn-sm">🎲 변경</button>
               </div>
             </div>
@@ -150,7 +151,8 @@
     <!-- 상단 방 정보 바 -->
     <section class="room-bar">
       <div class="room-bar-left">
-        <span class="room-code-box">방 코드: <strong id="room-code-display">-----</strong></span>
+        <span class="room-code-box" id="room-code-box" title="클릭하여 방 코드 복사" style="cursor:pointer">방 코드: <strong id="room-code-display">-----</strong></span>
+        <button type="button" id="btn-copy-code" class="btn-secondary btn-sm">📋 방 코드 복사</button>
         <span id="room-pw-badge" class="badge badge-open">🌐 공개방</span>
       </div>
       <div class="room-bar-right">

@@ -98,9 +98,14 @@
     $("btn-regen-create-nick").addEventListener("click", rollNewNickname);
     $("btn-regen-join-nick").addEventListener("click", rollNewNickname);
 
-    // 방 코드 새로고침
+    // 방 코드 새로고침 및 복사 (홈 화면)
     $("btn-regen-code").addEventListener("click", () => {
       $("create-room-code").value = window.QuizEngine.generateRoomCode(5);
+    });
+    $("btn-copy-create-code").addEventListener("click", () => {
+      const code = $("create-room-code").value.trim().toUpperCase();
+      if (!code) return;
+      copyToClipboard(code, `📋 방 코드 [${code}]가 클립보드에 복사되었습니다!`);
     });
 
     // 비밀번호 안내 표시 업데이트
@@ -170,15 +175,25 @@
       });
     });
 
+    // 방 내부 상단: 방 코드 클립보드 복사 (버튼 + 텍스트 클릭)
+    const copyCurrentRoomCode = () => {
+      if (!roomState.roomCode) return;
+      copyToClipboard(
+        roomState.roomCode,
+        `📋 방 코드 [${roomState.roomCode}]가 클립보드에 복사되었습니다!`
+      );
+    };
+    $("btn-copy-code").addEventListener("click", copyCurrentRoomCode);
+    $("room-code-box").addEventListener("click", copyCurrentRoomCode);
+
     // 초대 링크 복사
     $("btn-copy-link").addEventListener("click", () => {
       const url = new URL(window.location.href);
       url.searchParams.set("room", roomState.roomCode);
-      navigator.clipboard.writeText(url.toString()).then(() => {
-        showToast("초대 링크가 복사되었습니다! 단톡방에 공유해 보세요.");
-      }).catch(() => {
-        showToast("방 코드: " + roomState.roomCode);
-      });
+      copyToClipboard(
+        url.toString(),
+        "🔗 초대 링크가 복사되었습니다! 단톡방에 공유해 보세요."
+      );
     });
 
     // 멀티 테스트용 게스트 새 창 열기
@@ -1011,6 +1026,34 @@
     toastTimer = setTimeout(() => {
       el.classList.add("hidden");
     }, 3200);
+  }
+
+  function copyToClipboard(text, successMsg) {
+    const fallbackCopy = () => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast(ok ? successMsg : `복사할 값: ${text}`);
+      } catch (e) {
+        showToast(`복사할 값: ${text}`);
+      }
+    };
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => showToast(successMsg))
+        .catch(() => fallbackCopy());
+    } else {
+      fallbackCopy();
+    }
   }
 
   function escapeHtml(str) {
