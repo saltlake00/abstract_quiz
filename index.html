@@ -4,19 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="robots" content="noindex">
-  <title>추상화 그림맞추기 온라인 — 도형 아트 퀴즈</title>
+  <title>추상화 그림맞추기 온라인 — 아트 퀴즈</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="style.css?v=20261016-hud">
+  <link rel="stylesheet" href="style.css?v=20261026-painter">
 </head>
 <body>
   <!-- 상단 글로벌 네비게이션 -->
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <span class="brand-icon">🔺</span>
+        <span class="brand-icon">🎨</span>
         <div>
           <h1>추상화 그림맞추기 온라인</h1>
-          <p class="brand-sub">도형이 쌓이며 드러나는 실시간 멀티 퀴즈</p>
+          <p class="brand-sub">그림이 서서히 드러나는 실시간 멀티 퀴즈</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -90,6 +90,13 @@
                 <option value="40">40초 (여유)</option>
               </select>
             </div>
+            <div class="field-group">
+              <label for="create-art-style">그림 방식</label>
+              <select id="create-art-style">
+                <option value="triangle" selected>삼각형</option>
+                <option value="painter">붓질 (Quick Study)</option>
+              </select>
+            </div>
           </div>
 
           <div class="home-btn-row">
@@ -132,7 +139,7 @@
       <div class="rules-grid">
         <div class="rule-item">
           <strong>1. 모두가 같은 화면 공유</strong>
-          <p>도형 1개부터 260개까지 실시간으로 쌓이며 추상화가 점차 원래 그림으로 드러납니다.</p>
+          <p>삼각형이나 붓질이 순서대로 쌓이며 그림이 점차 드러납니다.</p>
         </div>
         <div class="rule-item">
           <strong>2. 실시간 채팅 & 스포 방지</strong>
@@ -140,7 +147,7 @@
         </div>
         <div class="rule-item">
           <strong>3. 빠를수록 높은 점수</strong>
-          <p>적은 도형 수에서 먼저 맞힐수록 최대 130점(기본 100 + 1등 보너스 30)을 획득합니다.</p>
+          <p>그림이 덜 드러났을 때 먼저 맞힐수록 최대 130점(기본 100 + 1등 보너스 30)을 획득합니다.</p>
         </div>
       </div>
     </section>
@@ -198,6 +205,13 @@
                 <option value="40">40초</option>
               </select>
             </div>
+            <div class="ls-item">
+              <label for="lobby-art-style">그림 방식</label>
+              <select id="lobby-art-style">
+                <option value="triangle">삼각형</option>
+                <option value="painter">붓질 (Quick Study)</option>
+              </select>
+            </div>
           </div>
 
           <div id="lobby-player-list" class="lobby-player-grid"></div>
@@ -213,7 +227,7 @@
           <p id="cd-round-label" class="cd-round">ROUND 1 / 5</p>
           <p id="cd-category-label" class="cd-cat">분야: 명화</p>
           <div id="cd-number" class="cd-num">3</div>
-          <p class="cd-desc">잠시 후 도형이 하나씩 그려집니다!</p>
+          <p class="cd-desc">잠시 후 그림이 그려집니다!</p>
         </div>
 
         <!-- C. 본 게임 추상화 캔버스 스테이지 -->
@@ -224,7 +238,7 @@
               <span id="game-cat-badge" class="hud-pill cat">명화</span>
             </div>
             <div class="hud-stats">
-              <span id="stat-shapes" class="stat-chip">도형 1 / 260</span>
+              <span id="stat-shapes" class="stat-chip">그림 1 / 260</span>
               <span id="stat-time" class="stat-chip">0.0s / 30s</span>
               <span id="stat-potential" class="stat-chip score-chip">지금 맞히면 +130점</span>
             </div>
@@ -235,7 +249,7 @@
           </div>
 
           <div id="hint-bar" class="hint-bar">
-            🎨 도형이 쌓이며 추상화가 구체화됩니다. 채팅창에 정답을 입력해 보세요!
+            🎨 그림이 점점 완성됩니다. 채팅창에 정답을 입력해 보세요!
           </div>
 
           <div class="canvas-stage-area">
@@ -315,7 +329,7 @@
   <script>
     (function () {
       var v = Date.now();
-      ["data/questions.js", "js/engine.js", "js/net.js", "js/app.js"].forEach(function (src) {
+      ["data/questions.js", "data/paintings.js", "js/engine.js", "js/net.js", "js/app.js"].forEach(function (src) {
         document.write('<script src="' + src + '?t=' + v + '"><\/script>');
       });
     })();

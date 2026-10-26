@@ -11,6 +11,7 @@
   "use strict";
 
   const QUESTIONS = window.QUIZ_QUESTIONS || [];
+  const PAINTINGS = window.QUIZ_PAINTINGS || {};
 
   // 로컬 상태
   let net = null;
@@ -28,6 +29,7 @@
       category: "전체",
       totalRounds: 5,
       durationSec: 30,
+      artStyle: "triangle",
       allowTypo: true,
     },
     players: {}, // uid -> { uid, nick, isHost, ready, score, solvedCount, roundSolved, roundRank, roundGain }
@@ -41,9 +43,25 @@
     chats: [], // 최근 채팅/시스템 메시지 배열 (최대 60개)
   };
 
-  // 현재 렌더링 중인 SVG 폴리곤 요소 캐시
-  let activeQuestionId = null;
-  let activePolygonEls = [];
+  // 현재 렌더링 중인 그림 요소 캐시
+  let activeArtworkKey = null;
+  let activeShapeEls = [];
+  let visibleShapeCount = 0;
+
+  function getArtwork(q) {
+    const painting = roomState.settings.artStyle === "painter" && PAINTINGS[q.id];
+    return painting || q;
+  }
+
+  function shapeCount(q) {
+    const art = getArtwork(q);
+    return art.strokes ? art.strokes.length : art.polygons.length;
+  }
+
+  function shapeLabel() {
+    const q = getQuestionById(roomState.currentQuestionId);
+    return q && getArtwork(q).strokes ? "붓질" : "도형";
+  }
 
   // DOM 참조 헬퍼
   const $ = (id) => document.getElementById(id);
@@ -163,7 +181,7 @@
     });
 
     // 대기실 방장 설정 변경
-    ["lobby-category", "lobby-rounds", "lobby-duration"].forEach((id) => {
+    ["lobby-category", "lobby-rounds", "lobby-duration", "lobby-art-style"].forEach((id) => {
       const el = $(id);
       if (!el) return;
       el.addEventListener("change", () => {
@@ -171,6 +189,7 @@
         roomState.settings.category = $("lobby-category").value;
         roomState.settings.totalRounds = parseInt($("lobby-rounds").value, 10) || 5;
         roomState.settings.durationSec = parseInt($("lobby-duration").value, 10) || 30;
+        roomState.settings.artStyle = $("lobby-art-style").value;
         syncStateFromHost();
       });
     });
@@ -347,6 +366,7 @@
     const category = $("create-category").value;
     const totalRounds = parseInt($("create-rounds").value, 10) || 5;
     const durationSec = parseInt($("create-duration").value, 10) || 30;
+    const artStyle = $("create-art-style").value;
 
     localStorage.setItem("aq_nick", nick);
 
@@ -361,6 +381,7 @@
         category,
         totalRounds,
         durationSec,
+        artStyle,
         allowTypo: true,
       },
       players: {
@@ -490,7 +511,7 @@
             // 정답 처리!
             const elapsed = Date.now() - roomState.roundStartAt;
             const durMs = roomState.settings.durationSec * 1000;
-            const totalPolys = q.polygons.length;
+            const totalPolys = shapeCount(q);
             const k = window.QuizEngine.computeVisibleCount(elapsed, durMs, totalPolys);
             const rankIdx = roomState.solvedOrder.length;
             const scoreObj = window.QuizEngine.calculateScore(k, totalPolys, rankIdx);
@@ -507,7 +528,7 @@
             addChatItem({
               kind: "correct",
               nick: player.nick,
-              text: `${rankLabel} ${player.nick}님이 도형 ${k}개(${secStr}초)에서 맞혔습니다! (+${scoreObj.total}점)`,
+              text: `${rankLabel} ${player.nick}님이 ${shapeLabel()} ${k}개(${secStr}초)에서 맞혔습니다! (+${scoreObj.total}점)`,
             });
 
             // 모든 참가자가 정답을 맞혔는지 확인
@@ -715,7 +736,7 @@
       roomState._baseElapsedMs = roomState.elapsedMs || 0;
     }
     if (prevPhase !== roomState.phase || prevQ !== roomState.currentQuestionId) {
-      activeQuestionId = null;
+      activeArtworkKey = null;
     }
     renderRoomUI();
   }
@@ -778,8 +799,9 @@
     $("lobby-category").value = roomState.settings.category;
     $("lobby-rounds").value = String(roomState.settings.totalRounds);
     $("lobby-duration").value = String(roomState.settings.durationSec);
+    $("lobby-art-style").value = roomState.settings.artStyle || "triangle";
 
-    ["lobby-category", "lobby-rounds", "lobby-duration"].forEach((id) => {
+    ["lobby-category", "lobby-rounds", "lobby-duration", "lobby-art-style"].forEach((id) => {
       $(id).disabled = !isHost;
     });
 
@@ -827,26 +849,32 @@
 
   function ensureSvgMounted(q) {
     if (!q) return;
-    if (activeQuestionId === q.id && activePolygonEls.length === q.polygons.length) {
+    const art = getArtwork(q);
+    const painter = Boolean(art.strokes);
+    const key = q.id + ":" + (painter ? "painter" : "triangle");
+    const count = shapeCount(q);
+    if (activeArtworkKey === key && activeShapeEls.length === count) {
       return;
     }
-    activeQuestionId = q.id;
+    activeArtworkKey = key;
     const container = $("svg-canvas-wrap");
-    const scaleAttr = q.scale && q.scale !== 1 ? `transform="scale(${q.scale}) translate(0.5 0.5)"` : "";
-    const polysHtml = q.polygons
-      .map(
-        (p) =>
+    const scaleAttr = !painter && q.scale && q.scale !== 1 ? `transform="scale(${q.scale}) translate(0.5 0.5)"` : "";
+    const shapesHtml = painter
+      ? art.strokes.map(([d, color, width, opacity]) =>
+          `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-opacity="${opacity}" stroke-linecap="round" stroke-linejoin="round" style="display:none" />`
+        ).join("")
+      : q.polygons.map((p) =>
           `<polygon fill="${p.fill}" fill-opacity="${p.opacity}" points="${p.points}" style="display:none" />`
-      )
-      .join("");
+        ).join("");
 
     container.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${q.width} ${q.height}">
-        <rect x="0" y="0" width="${q.width}" height="${q.height}" fill="${q.bg}" />
-        <g ${scaleAttr}>${polysHtml}</g>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${art.width} ${art.height}">
+        <rect x="0" y="0" width="${art.width}" height="${art.height}" fill="${art.bg}" />
+        <g ${scaleAttr}>${shapesHtml}</g>
       </svg>
     `;
-    activePolygonEls = Array.from(container.querySelectorAll("polygon"));
+    activeShapeEls = Array.from(container.querySelectorAll(painter ? "path" : "polygon"));
+    visibleShapeCount = 0;
   }
 
   function renderGameStage() {
@@ -866,19 +894,20 @@
       $("answer-desc").textContent = q.desc || "";
       $("btn-next-round").classList.toggle("hidden", !(net && net.isHost));
       // 전체 도형 모두 표시
-      updateVisiblePolygons(q.polygons.length, q.polygons.length, roomState.settings.durationSec * 1000);
+      updateVisibleShapes(shapeCount(q), shapeCount(q), roomState.settings.durationSec * 1000);
     } else {
       banner.classList.add("hidden");
     }
   }
 
-  function updateVisiblePolygons(k, totalPolys, elapsedMs) {
-    for (let i = 0; i < activePolygonEls.length; i++) {
-      activePolygonEls[i].style.display = i < k ? "" : "none";
+  function updateVisibleShapes(k, totalPolys, elapsedMs) {
+    for (let i = Math.min(k, visibleShapeCount); i < Math.max(k, visibleShapeCount); i++) {
+      activeShapeEls[i].style.display = i < k ? "" : "none";
     }
+    visibleShapeCount = k;
     const durMs = roomState.settings.durationSec * 1000;
     const sec = Math.min(durMs, Math.max(0, elapsedMs)) / 1000;
-    $("stat-shapes").textContent = `도형 ${k} / ${totalPolys}`;
+    $("stat-shapes").textContent = `${shapeLabel()} ${k} / ${totalPolys}`;
     $("stat-time").textContent = `${sec.toFixed(1)}s / ${roomState.settings.durationSec}s`;
 
     const scorePreview = window.QuizEngine.calculateScore(k, totalPolys, roomState.solvedOrder.length);
@@ -901,7 +930,9 @@
       hintBox.textContent = `💡 1단계 힌트: ${q.hint1}`;
       hintBox.className = "hint-bar active-1";
     } else {
-      hintBox.textContent = "🎨 도형이 쌓이며 추상화가 구체화됩니다. 채팅창에 정답을 입력해 보세요!";
+      hintBox.textContent = roomState.settings.artStyle === "painter"
+        ? "🎨 굵은 붓질부터 가는 붓질까지 쌓입니다. 채팅창에 정답을 입력해 보세요!"
+        : "🎨 도형이 쌓이며 추상화가 구체화됩니다. 채팅창에 정답을 입력해 보세요!";
       hintBox.className = "hint-bar";
     }
   }
@@ -925,9 +956,9 @@
           const k = window.QuizEngine.computeVisibleCount(
             currentElapsed,
             durMs,
-            q.polygons.length
+            shapeCount(q)
           );
-          updateVisiblePolygons(k, q.polygons.length, currentElapsed);
+          updateVisibleShapes(k, shapeCount(q), currentElapsed);
         }
       }
       animFrameId = requestAnimationFrame(frame);

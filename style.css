@@ -443,12 +443,16 @@ button:active {
 
 .lobby-settings-bar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   background: var(--bg-input);
   padding: 12px;
   border-radius: var(--radius-md);
   margin-bottom: 16px;
+}
+
+@media (max-width: 700px) {
+  .lobby-settings-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .ls-item label {

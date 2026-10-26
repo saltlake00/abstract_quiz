@@ -1,0 +1,133 @@
+# -*- coding: utf-8 -*-
+"""Build deterministic, coarse-to-fine brush strokes for the quiz's existing art.
+
+Inspired by Simon Willison's Quick Study Painter (Apache-2.0):
+https://github.com/simonw/tools/blob/main/quick-study-painter.html
+The quiz stores strokes ahead of time so every player sees the same painting.
+"""
+
+import json
+import math
+import random
+import re
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
+
+
+ROOT = Path(__file__).resolve().parents[1]
+QUESTIONS = ROOT / "data" / "questions.js"
+OUTPUT = ROOT / "data" / "paintings.js"
+LONG_SIDE = 256
+PASSES = (
+    (20, 25, 0, 0.93),
+    (11, 14, 19, 0.85),
+    (6, 7, 21, 0.78),
+    (4, 4, 25, 0.75),
+)
+
+
+def mona_from_svg(path):
+    """Rasterize the bundled Mona Lisa polygons without a network dependency."""
+    root = ET.parse(path).getroot()
+    width, height = [int(v) for v in root.attrib["viewBox"].split()[2:]]
+    image = Image.new("RGBA", (width, height), "#544733")
+    for polygon in root.iter():
+        if not polygon.tag.endswith("polygon"):
+            continue
+        values = [float(v) for v in re.split(r"[\s,]+", polygon.attrib["points"].strip())]
+        points = [(2 * (values[i] + 0.5), 2 * (values[i + 1] + 0.5)) for i in range(0, len(values), 2)]
+        color = polygon.attrib["fill"]
+        alpha = round(255 * float(polygon.attrib.get("fill-opacity", 1)))
+        layer = Image.new("RGBA", image.size)
+        ImageDraw.Draw(layer).polygon(points, fill=(*bytes.fromhex(color[1:]), alpha))
+        image = Image.alpha_composite(image, layer)
+    return image.convert("RGB")
+
+
+def source_image(question, index):
+    if question["id"] == "art_01":
+        return mona_from_svg(ROOT / "secondary_data" / "svg_quiz_01_art_01.svg")
+    path = ROOT / "primary_data" / f"{index:02d}_{question['id']}.png"
+    return Image.open(path).convert("RGB")
+
+
+def rounded(value):
+    return round(float(value), 1)
+
+
+def make_strokes(image, seed):
+    scale = LONG_SIDE / max(image.size)
+    size = tuple(max(1, round(v * scale)) for v in image.size)
+    image = image.resize(size, Image.Resampling.LANCZOS)
+    width, height = size
+    rng = random.Random(seed)
+    paper = (226, 218, 203)
+    painted = Image.new("RGB", size, paper)
+    strokes = []
+
+    for pass_index, (step, brush, threshold, opacity) in enumerate(PASSES):
+        blur = image.filter(ImageFilter.GaussianBlur(max(0.35, brush * 0.15)))
+        reference = np.asarray(blur, dtype=np.float32)
+        current = np.asarray(painted, dtype=np.float32)
+        error = np.sqrt(np.mean((reference - current) ** 2, axis=2))
+        light = np.dot(reference, (0.299, 0.587, 0.114))
+        gy, gx = np.gradient(light)
+        centers = []
+        for top in range(0, height, step):
+            for left in range(0, width, step):
+                block = error[top:min(height, top + step), left:min(width, left + step)]
+                if float(block.mean()) <= threshold:
+                    continue
+                if pass_index == 0:
+                    x = min(width - 1, left + rng.randrange(min(step, width - left)))
+                    y = min(height - 1, top + rng.randrange(min(step, height - top)))
+                else:
+                    by, bx = np.unravel_index(int(np.argmax(block)), block.shape)
+                    x, y = left + int(bx), top + int(by)
+                centers.append((x, y))
+        rng.shuffle(centers)
+        painter = ImageDraw.Draw(painted)
+
+        for x, y in centers:
+            dx, dy = -float(gy[y, x]), float(gx[y, x])
+            norm = math.hypot(dx, dy)
+            if norm < 3:
+                angle = rng.uniform(-math.pi, math.pi)
+                dx, dy = math.cos(angle), math.sin(angle)
+            else:
+                dx, dy = dx / norm, dy / norm
+            length = brush * rng.uniform(1.0, 2.6)
+            half = length / 2
+            bend = rng.uniform(-0.16, 0.16) * brush
+            x0, y0 = x - dx * half, y - dy * half
+            x1, y1 = x + dx * half, y + dy * half
+            xm, ym = x - dy * bend, y + dx * bend
+            color = tuple(int(v) for v in reference[y, x])
+            path = f"M{rounded(x0)} {rounded(y0)} Q{rounded(xm)} {rounded(ym)} {rounded(x1)} {rounded(y1)}"
+            strokes.append([path, "#" + "".join(f"{v:02x}" for v in color), brush, opacity])
+            painter.line([(x0, y0), (xm, ym), (x1, y1)], fill=color, width=brush, joint="curve")
+
+    return {"width": width, "height": height, "bg": "#e2dacb", "strokes": strokes}
+
+
+def main():
+    text = QUESTIONS.read_text(encoding="utf-8")
+    questions = json.loads(text.split("=", 1)[1].strip().rstrip(";"))
+    paintings = {}
+    for index, question in enumerate(questions, 1):
+        paintings[question["id"]] = make_strokes(source_image(question, index), 17000 + index)
+        print(question["id"], len(paintings[question["id"]]["strokes"]))
+    OUTPUT.write_text(
+        "// Generated by scripts/03_build_painter_dataset.py; Quick Study Painter inspired.\n"
+        + "window.QUIZ_PAINTINGS = "
+        + json.dumps(paintings, ensure_ascii=False, separators=(",", ":"))
+        + ";\n",
+        encoding="utf-8",
+    )
+
+
+if __name__ == "__main__":
+    main()
