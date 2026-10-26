@@ -10,8 +10,8 @@
 (function () {
   "use strict";
 
-  const QUESTIONS = window.QUIZ_QUESTIONS || [];
-  const PAINTINGS = window.QUIZ_PAINTINGS || {};
+  const QUESTIONS = (window.QUIZ_QUESTIONS || []).concat(window.QUIZ_EXTRA_QUESTIONS || []);
+  const PAINTINGS = Object.assign({}, window.QUIZ_PAINTINGS || {}, window.QUIZ_EXTRA_PAINTINGS || {});
 
   // 로컬 상태
   let net = null;
@@ -67,6 +67,7 @@
   const $ = (id) => document.getElementById(id);
 
   function init() {
+    populateQuestionOptions();
     // 접속 및 새로고침마다 새로운 랜덤 닉네임 자동 생성 (앞 수식어 + 행동 수식어 + 화가/야채/동물)
     const initialNick = window.QuizEngine.generateRandomNickname();
     $("create-nick").value = initialNick;
@@ -84,6 +85,31 @@
     }
 
     bindEvents();
+  }
+
+  function populateQuestionOptions() {
+    const categories = [...new Set(QUESTIONS.map((q) => q.category))];
+    for (const id of ["create-category", "lobby-category"]) {
+      const select = $(id);
+      select.options[0].textContent = `전체 (${QUESTIONS.length}선)`;
+      const known = new Set(Array.from(select.options, (option) => option.value));
+      for (const category of categories) {
+        if (known.has(category)) continue;
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        select.appendChild(option);
+      }
+    }
+    if (QUESTIONS.length > 15) {
+      $("create-rounds").querySelector('option[value="15"]').textContent = "15 라운드";
+      for (const id of ["create-rounds", "lobby-rounds"]) {
+        const option = document.createElement("option");
+        option.value = String(QUESTIONS.length);
+        option.textContent = `전체 ${QUESTIONS.length}라운드`;
+        $(id).appendChild(option);
+      }
+    }
   }
 
   function switchHomeTab(tab) {

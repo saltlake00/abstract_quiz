@@ -41,6 +41,7 @@
 * `pdfs/` : 관련 레퍼런스 문서 보관 폴더
 * `data/` : 웹 클라이언트용 문제 데이터 번들(`questions.js`)
   * `paintings.js`: 기존 15문항의 붓질 데이터. `python scripts/03_build_painter_dataset.py`로 재생성합니다.
+  * `extra_questions.js`: 추가 이미지 문제의 삼각형·붓질 데이터. 기본값은 빈 문제 목록입니다.
 * `js/` : 규칙 엔진(`engine.js`), 네트워크 및 비밀번호 인증(`net.js`), 화면 제어(`app.js`)
 
 ## 3. 로컬 실행 및 검증 방법
@@ -49,6 +50,28 @@
 python -m http.server 8795
 ```
 브라우저에서 `http://localhost:8795`에 접속합니다.
+
+### 사용권이 있는 이미지 문제 추가
+
+이미지 파일과 아래 형식의 JSON 매니페스트를 로컬에 준비합니다. `image`는 매니페스트 위치 기준 상대 경로이고, `focus`는 180×220 세로 크롭의 중심입니다.
+
+```json
+{
+  "questions": [{
+    "id": "portrait_01",
+    "category": "초상화",
+    "title": "정답 이름",
+    "answers": ["정답 이름", "별칭"],
+    "hint1": "첫 번째 힌트",
+    "hint2": "초성 힌트: ㅈ ㄷ",
+    "desc": "정답 공개 후 설명",
+    "image": "portrait.png",
+    "focus": [0.5, 0.45]
+  }]
+}
+```
+
+`python scripts/04_add_image_questions.py --manifest 이미지목록.json`을 실행하면 `data/extra_questions.js`가 생성됩니다. 방 생성·대기실의 분야와 라운드 선택지는 새 문제 수에 맞춰 늘어납니다. 사용할 수 있는 권리가 있는 이미지만 입력하세요.
 
 엔진 단위 시험 및 문법 검증은 다음 스크립트로 실행합니다.
 ```powershell
